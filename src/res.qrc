@@ -1,0 +1,7 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource>
+    <file alias="arrow-left.svg">../res/arrow-left.svg</file>
+    <file alias="arrow-right.svg">../res/arrow-right.svg</file>
+    <file alias="home.svg">../res/home.svg</file>
+</qresource>
+</RCC>
