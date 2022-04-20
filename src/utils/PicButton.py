@@ -1,5 +1,5 @@
 from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import QAbstractButton
+from PyQt5.QtWidgets import QAbstractButton, QWidget, QVBoxLayout, QLabel
 from PyQt5.QtCore import Qt
 
 class PicButton(QAbstractButton):
@@ -14,3 +14,15 @@ class PicButton(QAbstractButton):
 
     def sizeHint(self):
         return self.pixmap.size()
+
+
+class FileDirElem(QWidget):
+    def __init__(self, pixmap, x, y):
+        super().__init__()
+        image = PicButton(pixmap, x, y, parent=self)
+        label = QLabel("Test Test")
+
+        layout = QVBoxLayout(self)
+        self.setLayout(layout)
+        layout.addWidget(image)
+        layout.addWidget(label)

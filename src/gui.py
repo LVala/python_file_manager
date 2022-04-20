@@ -2,7 +2,7 @@ import sys
 
 import qrc_res
 from utils.FlowLayout import FlowLayout
-from utils.PicButton import PicButton
+from utils.PicButton import FileDirElem
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QApplication, 
@@ -17,6 +17,8 @@ from PyQt5.QtWidgets import (
     QStackedLayout,
     QVBoxLayout,
     QHBoxLayout,
+    QScrollArea,
+    QLayout,
 )
 from PyQt5.QtGui import (
     QIcon, 
@@ -183,22 +185,32 @@ class Window(QMainWindow):
         self.sidePanel.setPalette(pal3)
         self.sidePanel.setMinimumWidth(100)
         self.sidePanel.setMaximumWidth(300)  # TODO initial splitter ratio
+        
         layout.addWidget(pageCombo)
         layout.addLayout(stackedLayout)
 
     def _createMainPanel(self):
-        self.mainPanel = QWidget(self.centralWidget)
-        layout = FlowLayout()
-        self.mainPanel.setLayout(layout)
+        grid = QWidget()
+        grid_layout = FlowLayout()
+        grid.setLayout(grid_layout)
 
-        for _ in range(10):
-            a = PicButton(QPixmap(":folder.svg"), 70, 70)
-            layout.addWidget(a)
+        self.mainPanel = QScrollArea();
+        self.mainPanel.setWidgetResizable(True)
+        self.mainPanel.setWidget(grid)
+
+        # for _ in range(100):
+        #     a = PicButton(QPixmap(":folder.svg"), 70, 70)
+        #     grid_layout.addWidget(a)
+
+        # for i in range(25):
+        #     grid_layout.addWidget(QLabel(f"Label {i}"))
+
+        for i in range(25):
+            a = FileDirElem(QPixmap(":folder.svg"), 70, 70)
+            grid_layout.addWidget(a)
 
         pal = QPalette()
         pal.setColor(QPalette.Window, QColor(100, 100, 100))
-    
-
         self.mainPanel.setAutoFillBackground(True)
         self.mainPanel.setPalette(pal)
 
