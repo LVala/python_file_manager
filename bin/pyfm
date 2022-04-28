@@ -3,11 +3,13 @@
 import os
 import sys
 
-this_dir = os.path.dirname(__file__)
+this_file = os.path.realpath(__file__)
+this_dir = os.path.dirname(this_file)
 base_dir = os.path.abspath(os.path.join(this_dir, ".."))
 sys.path.insert(0, base_dir)
 
-from src.gui import main
+# from src.gui import main
 
 if __name__ == "__main__":
-    main()
+    print(sys.path)
+    # main()

@@ -1,8 +1,10 @@
 import sys
+import os
+from pathlib import Path
 
 import qrc_res
-from utils.FlowLayout import FlowLayout
-from utils.PicButton import FileDirElem
+from FlowLayout import FlowLayout
+from FileButton import FileButton
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QApplication, 
@@ -18,14 +20,14 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QScrollArea,
-    QLayout,
+    QTreeWidgetItem,
 )
 from PyQt5.QtGui import (
     QIcon, 
     QPalette, 
     QColor,
-    QPixmap,
 )
+from file_mgn import listAllFiles
 
 class Window(QMainWindow):
     def __init__(self, parent=None):
@@ -34,6 +36,12 @@ class Window(QMainWindow):
         self.resize(900, 700)
         self.centralWidget = QWidget(self)
         self.setCentralWidget(self.centralWidget)
+
+        self.curPath = os.getenv("HOME")
+        self.files = listAllFiles(self.curPath)
+        self.highlited = []
+        self.historyIndex = 0
+        self.history = [os.getenv("HOME")]
 
         self._createActions()
         self._createMenuBar()
@@ -48,6 +56,53 @@ class Window(QMainWindow):
         layout.addWidget(splitter);
         splitter.addWidget(self.sidePanel)
         splitter.addWidget(self.mainPanel)
+
+    ##### MISCELLANEOUS #####
+
+    def _addToHist(self, dir_path):
+        if self.historyIndex == len(self.history)-1:
+            self.history.append(dir_path)
+            self.historyIndex += 1
+        else:
+            self.historyIndex += 1
+            self.history[self.historyIndex] = dir_path
+            self.history = self.history[:self.historyIndex+1]
+
+    def _clearHighlited(self):
+        # TODO przywrocenie kolorkow do oryginalnych
+        self.highlited.clear()
+        pass
+
+    def addToHighlited(self, path, ctrl):
+        # TODO zmienianie kolorków podświetlonych elementów
+        if ctrl and path not in self.highlited:
+            self.highlited.append(path)
+        elif not ctrl and path not in self.highlited:
+            self._clearHighlited()
+            self.highlited.append(path)
+
+    ##### ACTIONS AND ACTION HANDLING #####
+
+    def _handleGoPrevAction(self):
+        if self.historyIndex > 0:
+            self.historyIndex -= 1
+            self.jumpToDir(self.history[self.historyIndex], False)
+
+    def _handleGoNextAction(self):
+        if self.historyIndex < len(self.history)-1:
+            self.historyIndex += 1
+            self.jumpToDir(self.history[self.historyIndex], False)
+
+    def _handleGoParentAction(self):
+        pathob = Path(self.curPath)
+        path = pathob.parent.absolute()
+        self.jumpToDir(path, True)
+
+    def _handleGoHomeAction(self):
+        self.jumpToDir(os.getenv("HOME"), True)
+
+    def _handleGoToAction(self):
+        self.jumpToDir(self.dirPathSpinBox.text(), True)
 
     def _createActions(self):
         self.newWindowAction = QAction(QIcon(":add.svg"), "&New Window", self)
@@ -69,14 +124,21 @@ class Window(QMainWindow):
         self.showHiddenAction = QAction("&Show Hidden", self)
 
         self.goPrevAction = QAction(QIcon(":left.svg"), "&Previous Folder", self)
+        self.goPrevAction.triggered.connect(self._handleGoPrevAction)
         self.goNextAction = QAction(QIcon(":right.svg"), "&Next Folder", self)
+        self.goNextAction.triggered.connect(self._handleGoNextAction)
         self.goParentAction = QAction(QIcon(":down.svg"), "&Parent Folder", self)
+        self.goParentAction.triggered.connect(self._handleGoParentAction)
         self.goHomeAction = QAction(QIcon(":home.svg"), "&Home", self)
+        self.goHomeAction.triggered.connect(self._handleGoHomeAction)
 
         self.helpAction = QAction("&Help Content", self)
         self.aboutAction = QAction("&About", self)
 
         self.goToAction = QAction(QIcon(":forward.svg"), "&Go to the path in the location bar", self);
+        self.goToAction.triggered.connect(self._handleGoToAction)
+
+    ##### CREATIONG OF MENU, TOOLBAR, CONTEXT MENU, STATUS BAR #####
 
     def _createMenuBar(self):
         menuBar = self.menuBar()
@@ -126,14 +188,17 @@ class Window(QMainWindow):
         toolBar.addAction(self.goNextAction)
         toolBar.addAction(self.goHomeAction)
 
-        names = ["Apple", "Alps", "Berry", "Cherry" ]  # TODO temporary
-        completer = QCompleter(names)
-
         self.dirPathSpinBox = QLineEdit()
-        self.dirPathSpinBox.setCompleter(completer)
+        self.dirPathSpinBox.setText(self.curPath)
+        # self._setLocationBarCompleter() TODO
         toolBar.addWidget(self.dirPathSpinBox)
 
         toolBar.addAction(self.goToAction);
+
+    # def _setLocationBarCompleter(self): TODO
+    #     names = [f.split(os.sep)[-1] for f in self.files]
+    #     completer = QCompleter(names)
+    #     self.dirPathSpinBox.setCompleter(completer)
 
     def _createContextMenu(self):
         self.centralWidget.setContextMenuPolicy(Qt.ActionsContextMenu)
@@ -148,6 +213,8 @@ class Window(QMainWindow):
         self.statusbar = self.statusBar()
         self.testLabel = QLabel("Test message")
         self.statusbar.addPermanentWidget(self.testLabel)
+
+    ##### CREATION OF SIDE AND MAIN PANELS #####
     
     def _createSidePanel(self):
         def switchPage():
@@ -189,31 +256,40 @@ class Window(QMainWindow):
         layout.addWidget(pageCombo)
         layout.addLayout(stackedLayout)
 
+    def jumpToDir(self, dir_path, addToHist):
+        if os.path.isdir(dir_path):
+            if addToHist: 
+                self._addToHist(dir_path);
+
+            self.curPath = dir_path
+            self.files = listAllFiles(self.curPath)
+            self.dirPathSpinBox.setText(self.curPath)
+            self.highlited.clear()
+            self._updateMainPanel()
+
+    def _updateMainPanel(self):
+        for i in reversed(range(self.grid_layout.count())): 
+            self.grid_layout.itemAt(i).widget().setParent(None)
+        
+        for f in self.files:
+            fileButton = FileButton(f, 70, 70, parent=self)
+            self.grid_layout.addWidget(fileButton)
+
     def _createMainPanel(self):
         grid = QWidget()
-        grid_layout = FlowLayout()
-        grid.setLayout(grid_layout)
+        self.grid_layout = FlowLayout()
+        grid.setLayout(self.grid_layout)
 
         self.mainPanel = QScrollArea();
         self.mainPanel.setWidgetResizable(True)
         self.mainPanel.setWidget(grid)
 
-        # for _ in range(100):
-        #     a = PicButton(QPixmap(":folder.svg"), 70, 70)
-        #     grid_layout.addWidget(a)
-
-        # for i in range(25):
-        #     grid_layout.addWidget(QLabel(f"Label {i}"))
-
-        for i in range(25):
-            a = FileDirElem(QPixmap(":folder.svg"), 70, 70)
-            grid_layout.addWidget(a)
+        self._updateMainPanel()
 
         pal = QPalette()
         pal.setColor(QPalette.Window, QColor(100, 100, 100))
         self.mainPanel.setAutoFillBackground(True)
         self.mainPanel.setPalette(pal)
-
 
 def main():
     app = QApplication(sys.argv)
