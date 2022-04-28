@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QScrollArea,
     QTreeWidgetItem,
+    QTreeWidget,
 )
 from PyQt5.QtGui import (
     QIcon, 
@@ -81,6 +82,26 @@ class Window(QMainWindow):
             self._clearHighlited()
             self.highlited.append(path)
 
+    def jumpToDir(self, dir_path, addToHist):
+        if os.path.isdir(dir_path):
+            if addToHist: 
+                self._addToHist(dir_path);
+
+            self.curPath = dir_path
+            self.files = listAllFiles(self.curPath)
+            self.dirPathSpinBox.setText(self.curPath)
+            self.highlited.clear()
+            self._updateMainPanel()
+
+    def printDirTree(self, startpath, tree):
+        for element in os.listdir(startpath):
+            path_info = startpath + "/" + element
+            if os.path.isdir(path_info):
+                parent_itm = QTreeWidgetItem(tree, [os.path.basename(element)])
+                parent_itm.path = path_info
+                self.printDirTree(path_info, parent_itm)
+                parent_itm.setIcon(0, QIcon(":folder.svg"))
+
     ##### ACTIONS AND ACTION HANDLING #####
 
     def _handleGoPrevAction(self):
@@ -138,7 +159,7 @@ class Window(QMainWindow):
         self.goToAction = QAction(QIcon(":forward.svg"), "&Go to the path in the location bar", self);
         self.goToAction.triggered.connect(self._handleGoToAction)
 
-    ##### CREATIONG OF MENU, TOOLBAR, CONTEXT MENU, STATUS BAR #####
+    ##### MENU, TOOLBAR, CONTEXT MENU, STATUS BAR #####
 
     def _createMenuBar(self):
         menuBar = self.menuBar()
@@ -214,7 +235,7 @@ class Window(QMainWindow):
         self.testLabel = QLabel("Test message")
         self.statusbar.addPermanentWidget(self.testLabel)
 
-    ##### CREATION OF SIDE AND MAIN PANELS #####
+    ##### SIDE PANEL #####
     
     def _createSidePanel(self):
         def switchPage():
@@ -230,7 +251,15 @@ class Window(QMainWindow):
         # stacked layout to switch between pages
         stackedLayout = QStackedLayout()
         # pages
-        dirTreePage = QWidget(self.sidePanel)
+        dirTreePage = QTreeWidget(self.sidePanel);
+        self.printDirTree("/home/lukasz/Projects", dirTreePage)
+
+        def onItemClicked():
+            self.jumpToDir(dirTreePage.selectedItems()[0].path, True)
+
+        dirTreePage.doubleClicked.connect(onItemClicked)
+
+
         stackedLayout.addWidget(dirTreePage)
 
         placesPage = QWidget(self.sidePanel)
@@ -256,16 +285,7 @@ class Window(QMainWindow):
         layout.addWidget(pageCombo)
         layout.addLayout(stackedLayout)
 
-    def jumpToDir(self, dir_path, addToHist):
-        if os.path.isdir(dir_path):
-            if addToHist: 
-                self._addToHist(dir_path);
-
-            self.curPath = dir_path
-            self.files = listAllFiles(self.curPath)
-            self.dirPathSpinBox.setText(self.curPath)
-            self.highlited.clear()
-            self._updateMainPanel()
+    ##### MAIN PANEL #####
 
     def _updateMainPanel(self):
         for i in reversed(range(self.grid_layout.count())): 
