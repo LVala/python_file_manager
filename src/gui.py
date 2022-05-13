@@ -1,6 +1,8 @@
 import sys
 import os
+import subprocess
 from pathlib import Path
+from copy import copy
 
 import qrc_res
 from FlowLayout import FlowLayout
@@ -9,7 +11,9 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QApplication, 
     QWidget, 
-    QMainWindow, 
+    QMainWindow,
+    QDialog,
+    QDialogButtonBox,
     QAction, 
     QLineEdit, 
     QLabel, 
@@ -28,7 +32,35 @@ from PyQt5.QtGui import (
     QPalette, 
     QColor,
 )
-from file_mgn import listAllFiles
+from file_mgn import *
+
+class PropertiesDialog(QDialog):
+    def __init__(self, path, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Properties')
+        layout = QVBoxLayout()
+        # btns = QDialogButtonBox()
+        # btns.setStandardButtons(QDialogButtonBox.Ok)
+        # layout.addWidget(btns)
+        self.setLayout(layout)
+
+        info = getFileInfo(path)
+        name = QLabel(f"Name: {path.split(os.sep)[-1]}")
+        location = QLabel(f"Location: {'/'.join(path.split(os.sep)[0:-1])}")
+        ftype = QLabel(f"Type: {info['type']}")
+        permissions = QLabel(f"Permissions: {info['permissions']}")
+        size = QLabel(f"Size: {info['size']} K")
+        lastmod = QLabel(f"Last modification date: {info['lastmod']}")
+        lastaccess = QLabel(f"Last access date: {info['lastaccess']}")
+        lastmeta = QLabel(f"Last metadata modification date: {info['lastmeta']}")
+        layout.addWidget(name)
+        layout.addWidget(location)
+        layout.addWidget(ftype)
+        layout.addWidget(permissions)
+        layout.addWidget(size)
+        layout.addWidget(lastmod)
+        layout.addWidget(lastaccess)
+        layout.addWidget(lastmeta)
 
 class Window(QMainWindow):
     def __init__(self, parent=None):
@@ -40,7 +72,9 @@ class Window(QMainWindow):
 
         self.curPath = os.getenv("HOME")
         self.files = listAllFiles(self.curPath)
-        self.highlited = []
+        self.highlighted = []
+        self.clipboard = []
+        self.clipaction = None
         self.historyIndex = 0
         self.history = [os.getenv("HOME")]
 
@@ -70,19 +104,29 @@ class Window(QMainWindow):
             self.history = self.history[:self.historyIndex+1]
 
     def _clearHighlited(self):
-        # TODO przywrocenie kolorkow do oryginalnych
-        self.highlited.clear()
-        pass
+        for i in self.highlighted:
+            i.deHighlight()
+        self.highlighted.clear()
 
-    def addToHighlited(self, path, ctrl):
-        # TODO zmienianie kolorków podświetlonych elementów
-        if ctrl and path not in self.highlited:
-            self.highlited.append(path)
-        elif not ctrl and path not in self.highlited:
+    def manageHighlighted(self, button, ctrl):
+        if len(self.highlighted) and self.curPath == self.highlighted[0].path:
             self._clearHighlited()
-            self.highlited.append(path)
+
+        if button not in self.highlighted:
+            if ctrl:
+                button.highlight()
+                self.highlighted.append(button)
+            else:
+                self._clearHighlited()
+                button.highlight()
+                self.highlighted.append(button)
+        else:
+            if ctrl:
+                button.deHighlight()
+                self.highlighted.remove(button)
 
     def jumpToDir(self, dir_path, addToHist):
+        dir_path = os.path.realpath(dir_path)
         if os.path.isdir(dir_path):
             if addToHist: 
                 self._addToHist(dir_path);
@@ -90,8 +134,8 @@ class Window(QMainWindow):
             self.curPath = dir_path
             self.files = listAllFiles(self.curPath)
             self.dirPathSpinBox.setText(self.curPath)
-            self.highlited.clear()
             self._updateMainPanel()
+            self._clearHighlited()
 
     def printDirTree(self, startpath, tree):
         for element in os.listdir(startpath):
@@ -125,23 +169,74 @@ class Window(QMainWindow):
     def _handleGoToAction(self):
         self.jumpToDir(self.dirPathSpinBox.text(), True)
 
+    def _handleNewWindowAction(self):
+        subprocess.Popen(["python", "./gui.py"])
+
+    def _handleCloseWindowAction(self):
+        exit(0)
+
+    def _handleRemoveAction(self):
+        removeAllFiles([button.path for button in self.highlighted])
+        self.files = listAllFiles(self.curPath)
+        self._updateMainPanel()
+
+    def _handleSelectAllAction(self):
+        self._clearHighlited()
+        for i in reversed(range(self.grid_layout.count())): 
+            self.manageHighlighted(self.grid_layout.itemAt(i).widget(), True)
+
+    def _handleReloadFolderAction(self):
+        self.files = listAllFiles(self.curPath)
+        self._updateMainPanel()
+
+    def _handleCutAction(self):
+        self.clipboard = copy([button.path for button in self.highlighted])
+        self.clipaction = moveAllFiles
+
+    def _handleCopyAction(self):
+        self.clipboard = copy([button.path for button in self.highlighted])
+        self.clipaction = copyAllFiles
+
+    def _handlePasteAction(self):
+        if len(self.clipboard) > 0:
+            self.clipaction(self.clipboard, self.curPath)
+            self.clipboard.clear()
+            self.files = listAllFiles(self.curPath)
+            self._updateMainPanel()
+
+    def _handleGetPropAction(self):
+        if len(self.highlighted) > 0:
+            dlg = PropertiesDialog(self.highlighted[0].path, parent=self)
+            dlg.show()
+
     def _createActions(self):
         self.newWindowAction = QAction(QIcon(":add.svg"), "&New Window", self)
+        self.newWindowAction.triggered.connect(self._handleNewWindowAction)
         self.closeWindowAction = QAction(QIcon(":minus.svg"), "&Close Window")
+        self.closeWindowAction.triggered.connect(self._handleCloseWindowAction)
         self.newFolderAction = QAction(QIcon(":folder.svg"), "&Folder", self)
+        # TODO
         self.newFileAction = QAction(QIcon(":file.svg"), "&File", self)
+        # TODO
         self.folderPropAction = QAction("&Folder Properties", self)
 
         self.openAction = QAction(QIcon(":add.svg"), "&Open", self)
         self.cutAction = QAction(QIcon(":scissors.svg"), "C&ut", self)
+        self.cutAction.triggered.connect(self._handleCutAction)
         self.copyAction = QAction("&Copy", self)
+        self.copyAction.triggered.connect(self._handleCopyAction)
         self.pasteAction = QAction("&Paste", self)
+        self.pasteAction.triggered.connect(self._handlePasteAction)
         self.removeAction = QAction(QIcon(":delete.svg"), "&Remove", self)
+        self.removeAction.triggered.connect(self._handleRemoveAction)
         self.getPropAction = QAction("&Properties", self)
+        self.getPropAction.triggered.connect(self._handleGetPropAction)
         self.renameAction = QAction(QIcon(":edit.svg"), "&Rename", self)
         self.selectAllAction = QAction("&Select All", self)
+        self.selectAllAction.triggered.connect(self._handleSelectAllAction)
 
         self.reloadFolderAction = QAction(QIcon(":refresh.svg"), "&Reload Folder", self)
+        self.reloadFolderAction.triggered.connect(self._handleReloadFolderAction)
         self.showHiddenAction = QAction("&Show Hidden", self)
 
         self.goPrevAction = QAction(QIcon(":left.svg"), "&Previous Folder", self)
@@ -207,6 +302,7 @@ class Window(QMainWindow):
         toolBar.setMovable(False)
         toolBar.addAction(self.goPrevAction)
         toolBar.addAction(self.goNextAction)
+        toolBar.addAction(self.goParentAction)
         toolBar.addAction(self.goHomeAction)
 
         self.dirPathSpinBox = QLineEdit()
@@ -297,6 +393,7 @@ class Window(QMainWindow):
 
     def _createMainPanel(self):
         grid = QWidget()
+        grid.mouseReleaseEvent = lambda event: self._clearHighlited()
         self.grid_layout = FlowLayout()
         grid.setLayout(self.grid_layout)
 

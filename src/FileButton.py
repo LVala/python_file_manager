@@ -1,8 +1,8 @@
 import qrc_res
 
 import os
-from PyQt5.QtGui import QPainter, QPixmap
-from PyQt5.QtWidgets import QAbstractButton, QWidget, QVBoxLayout, QLabel
+from PyQt5.QtGui import QPainter, QPixmap, QColor, QBrush, QPen
+from PyQt5.QtWidgets import QAbstractButton, QWidget, QVBoxLayout, QLabel, QApplication
 from PyQt5.QtCore import Qt
 
 class PicButton(QAbstractButton):
@@ -10,10 +10,25 @@ class PicButton(QAbstractButton):
         super(PicButton, self).__init__(parent)
         self.pixmap = pixmap
         self.pixmap = pixmap.scaled(x, y, Qt.KeepAspectRatio)
+        self.pixmap_copy = pixmap
+        self.pixmap_copy = pixmap.scaled(x, y, Qt.KeepAspectRatio)
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.drawPixmap(event.rect(), self.pixmap)
+
+    def highlight(self):
+        mask = QPainter(self.pixmap)
+        brush = QBrush(QColor(0,0,0,128))
+        pen = QPen(QColor(0,0,0,0))
+        mask.setBrush(brush)
+        mask.setPen(pen)
+        mask.drawRect(0,0,200,200)
+        self.update()
+
+    def deHighlight(self):
+        self.pixmap = self.pixmap_copy.copy()
+        self.update()
 
     def sizeHint(self):
         return self.pixmap.size()
@@ -23,25 +38,32 @@ class FileButton(QWidget):
         super().__init__()
         pixmap = QPixmap(":folder.svg") if os.path.isdir(path) else QPixmap(":file.svg")
         self.parent = parent;
-        image = PicButton(pixmap, x, y, parent=self)
-        image.setFixedSize(x, y)
+        self.image = PicButton(pixmap, x, y, parent=self)
+        self.image.setFixedSize(x, y)
         self.setFixedWidth(y+20)
+
         self.path = path
         self.label = QLabel(path.split(os.sep)[-1])
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setWordWrap(True)
 
-        layout = QVBoxLayout(self)
-        self.setLayout(layout)
-        layout.addWidget(image)
-        layout.addWidget(self.label)
+        self.layout = QVBoxLayout(self)
+        self.setLayout(self.layout)
+        self.layout.addWidget(self.image)
+        self.layout.addWidget(self.label)
 
-        image.mouseDoubleClickEvent = self.mouseDoubleClickEvent
+        self.image.mouseDoubleClickEvent = self.mouseDoubleClickEvent
+        self.image.mouseReleaseEvent = self.mouseReleaseEvent
+    
+    def highlight(self):
+        self.image.highlight() 
+    
+    def deHighlight(self):
+        self.image.deHighlight()
     
     def mouseDoubleClickEvent(self, event):
-        if os.path.isdir(self.path):
-            self.parent.jumpToDir(self.path, True)
+        self.parent.jumpToDir(self.path, True)
 
     def mouseReleaseEvent(self, event):
-        modifiers = Qt.KeyboardModifier()
-        self.parent.addToHighlited(self.path, modifiers == Qt.ControlModifier)
+        modifiers = QApplication.keyboardModifiers()
+        self.parent.manageHighlighted(self, modifiers == Qt.ControlModifier)
