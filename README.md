@@ -11,7 +11,3 @@ This repository contains our project for Programming in Python Course.
 ```
 pip install -r requirements.txt
 ```
-
-#### Authors:
-- Julia Osika
-- Łukasz Wala
