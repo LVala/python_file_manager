@@ -55,3 +55,29 @@ def getFileInfo(path):
     stat_dir["lastmeta"] = datetime.fromtimestamp(stat_dir["lastmeta"], tz=timezone.utc)
 
     return stat_dir
+
+def changeUnit(value):
+    if value < 2**10:
+        return value, "B"
+    elif value <2**20:
+        return value / 2**10, "KiB"
+    elif value <2**30:
+        return value / 2**20, "MiB"
+    else:
+        return value / 2**30, "GiB"
+
+def getPartUsage(path):
+    total, _, free = shutil.disk_usage(path)
+    return changeUnit(total), changeUnit(free)
+
+def renameFile(path, newname):
+    os.rename(path, newname)
+
+
+
+# TODO:
+# upiekszenie i bugi wizualne
+# skroty klawiszowe
+# context menus
+# podpowiadanie w pasku
+# featury: glownie otwieranie plikow

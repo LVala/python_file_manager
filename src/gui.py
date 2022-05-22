@@ -26,6 +26,7 @@ from PyQt5.QtWidgets import (
     QScrollArea,
     QTreeWidgetItem,
     QTreeWidget,
+    QInputDialog,
 )
 from PyQt5.QtGui import (
     QIcon, 
@@ -108,10 +109,9 @@ class Window(QMainWindow):
             i.deHighlight()
         self.highlighted.clear()
 
-    def manageHighlighted(self, button, ctrl):
-        if len(self.highlighted) and self.curPath == self.highlighted[0].path:
-            self._clearHighlited()
+        self._getItemCount()
 
+    def manageHighlighted(self, button, ctrl):
         if button not in self.highlighted:
             if ctrl:
                 button.highlight()
@@ -124,6 +124,8 @@ class Window(QMainWindow):
             if ctrl:
                 button.deHighlight()
                 self.highlighted.remove(button)
+
+        self._getItemCount()
 
     def jumpToDir(self, dir_path, addToHist):
         dir_path = os.path.realpath(dir_path)
@@ -209,18 +211,45 @@ class Window(QMainWindow):
             dlg = PropertiesDialog(self.highlighted[0].path, parent=self)
             dlg.show()
 
+    def _handleNewFolderAction(self):
+        text, ok = QInputDialog.getText(self, "folder name input", "Enter new folder name")
+        if ok:
+            createDirectory(os.path.join(self.curPath, text))
+            self.files = listAllFiles(self.curPath)
+            self._updateMainPanel()
+
+    def _handleNewFileAction(self):
+        text, ok = QInputDialog.getText(self, "folder name input", "Enter new file name")
+        if ok:
+            createEmptyFile(os.path.join(self.curPath, text))
+            self.files = listAllFiles(self.curPath)
+            self._updateMainPanel()
+
+    def _handleRenameAction(self):
+        if len(self.highlighted) == 1:
+            text, ok = QInputDialog.getText(self, "folder name input", "Enter new file name")
+            if ok:
+                renameFile(self.highlighted[0].path, os.path.join(self.curPath, text))
+                self.files = listAllFiles(self.curPath)
+                self._updateMainPanel()
+
+    def _handleGetCurPropAction(self):
+        dlg = PropertiesDialog(self.curPath, parent=self)
+        dlg.show()
+    
+
     def _createActions(self):
         self.newWindowAction = QAction(QIcon(":add.svg"), "&New Window", self)
         self.newWindowAction.triggered.connect(self._handleNewWindowAction)
         self.closeWindowAction = QAction(QIcon(":minus.svg"), "&Close Window")
         self.closeWindowAction.triggered.connect(self._handleCloseWindowAction)
         self.newFolderAction = QAction(QIcon(":folder.svg"), "&Folder", self)
-        # TODO
+        self.newFolderAction.triggered.connect(self._handleNewFolderAction)
         self.newFileAction = QAction(QIcon(":file.svg"), "&File", self)
-        # TODO
-        self.folderPropAction = QAction("&Folder Properties", self)
+        self.newFileAction.triggered.connect(self._handleNewFileAction)
 
         self.openAction = QAction(QIcon(":add.svg"), "&Open", self)
+        # TODO
         self.cutAction = QAction(QIcon(":scissors.svg"), "C&ut", self)
         self.cutAction.triggered.connect(self._handleCutAction)
         self.copyAction = QAction("&Copy", self)
@@ -232,12 +261,14 @@ class Window(QMainWindow):
         self.getPropAction = QAction("&Properties", self)
         self.getPropAction.triggered.connect(self._handleGetPropAction)
         self.renameAction = QAction(QIcon(":edit.svg"), "&Rename", self)
+        self.renameAction.triggered.connect(self._handleRenameAction)
         self.selectAllAction = QAction("&Select All", self)
         self.selectAllAction.triggered.connect(self._handleSelectAllAction)
 
         self.reloadFolderAction = QAction(QIcon(":refresh.svg"), "&Reload Folder", self)
         self.reloadFolderAction.triggered.connect(self._handleReloadFolderAction)
         self.showHiddenAction = QAction("&Show Hidden", self)
+        # TODO
 
         self.goPrevAction = QAction(QIcon(":left.svg"), "&Previous Folder", self)
         self.goPrevAction.triggered.connect(self._handleGoPrevAction)
@@ -249,12 +280,17 @@ class Window(QMainWindow):
         self.goHomeAction.triggered.connect(self._handleGoHomeAction)
 
         self.helpAction = QAction("&Help Content", self)
+        # TODO
         self.aboutAction = QAction("&About", self)
+        # TODO
 
         self.goToAction = QAction(QIcon(":forward.svg"), "&Go to the path in the location bar", self);
         self.goToAction.triggered.connect(self._handleGoToAction)
 
-    ##### MENU, TOOLBAR, CONTEXT MENU, STATUS BAR #####
+        self.getCurPropAction = QAction("&Folder Properties", self)
+        self.getCurPropAction.triggered.connect(self._handleGetCurPropAction)
+
+    ##### MENU, TOOLBAR, CONTEXT MENU #####
 
     def _createMenuBar(self):
         menuBar = self.menuBar()
@@ -265,7 +301,6 @@ class Window(QMainWindow):
         createMenu.addAction(self.newFolderAction)
         createMenu.addAction(self.newFileAction)
         fileMenu.addSeparator()
-        fileMenu.addAction(self.folderPropAction)
         fileMenu.addSeparator()
         fileMenu.addAction(self.closeWindowAction)
 
@@ -319,17 +354,45 @@ class Window(QMainWindow):
 
     def _createContextMenu(self):
         self.centralWidget.setContextMenuPolicy(Qt.ActionsContextMenu)
+        
+        separator1 = QAction(self)
+        separator1.setSeparator(True)
+        separator2 = QAction(self)
+        separator2.setSeparator(True)
+        separator3 = QAction(self)
+        separator3.setSeparator(True)
 
         self.centralWidget.addAction(self.newFileAction)
-        self.centralWidget.addAction(self.openAction)
-        self.centralWidget.addAction(self.copyAction)
+        self.centralWidget.addAction(self.newFolderAction)
+        self.centralWidget.addAction(separator1)
         self.centralWidget.addAction(self.pasteAction)
-        self.centralWidget.addAction(self.cutAction)
+        self.centralWidget.addAction(separator2)
+        self.centralWidget.addAction(self.selectAllAction)
+        self.centralWidget.addAction(separator3)
+        self.centralWidget.addAction(self.getCurPropAction)
+
+    ##### STATUS BAR #####
 
     def _createStatusBar(self):
         self.statusbar = self.statusBar()
-        self.testLabel = QLabel("Test message")
-        self.statusbar.addPermanentWidget(self.testLabel)
+        self._getSpaceUsed(True)
+
+    def _getItemCount(self):
+        if len(self.highlighted) == 0:
+            message = f"{len(self.files)} items"
+        elif len(self.highlighted) == 1:
+            message = f"\"{self.highlighted[0].path.split(os.sep)[-1]}\" selected"
+        else:
+            message = f"{len(self.highlighted)} items selected"
+
+        self.statusbar.showMessage(message, 0)
+
+    def _getSpaceUsed(self, iffirst):
+        if not iffirst:
+            self.statusbar.removeWidget(self.itemCountLabel)
+        total, free = getPartUsage(self.curPath)
+        self.itemCountLabel = QLabel(f"Free space: {free[0]:.1f} {free[1]} (Total: {total[0]:.1f} {total[1]})")
+        self.statusbar.addPermanentWidget(self.itemCountLabel)
 
     ##### SIDE PANEL #####
     
@@ -390,6 +453,9 @@ class Window(QMainWindow):
         for f in self.files:
             fileButton = FileButton(f, 70, 70, parent=self)
             self.grid_layout.addWidget(fileButton)
+
+        self._clearHighlited()
+        self._getSpaceUsed(False)
 
     def _createMainPanel(self):
         grid = QWidget()

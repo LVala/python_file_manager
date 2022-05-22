@@ -2,7 +2,7 @@ import qrc_res
 
 import os
 from PyQt5.QtGui import QPainter, QPixmap, QColor, QBrush, QPen
-from PyQt5.QtWidgets import QAbstractButton, QWidget, QVBoxLayout, QLabel, QApplication
+from PyQt5.QtWidgets import QAbstractButton, QAction, QWidget, QVBoxLayout, QLabel, QApplication, QMenu
 from PyQt5.QtCore import Qt
 
 class PicButton(QAbstractButton):
@@ -54,6 +54,29 @@ class FileButton(QWidget):
 
         self.image.mouseDoubleClickEvent = self.mouseDoubleClickEvent
         self.image.mouseReleaseEvent = self.mouseReleaseEvent
+
+    def contextMenuEvent(self, event):
+        contextMenu = QMenu(self);
+
+        separator1 = QAction(self)
+        separator1.setSeparator(True)
+        separator2 = QAction(self)
+        separator2.setSeparator(True)
+        separator3 = QAction(self)
+        separator3.setSeparator(True)
+
+        contextMenu.addAction(self.parent.openAction)
+        contextMenu.addAction(separator1)
+        contextMenu.addAction(self.parent.cutAction)
+        contextMenu.addAction(self.parent.copyAction)
+        contextMenu.addAction(self.parent.removeAction)
+        contextMenu.addAction(separator2)
+        contextMenu.addAction(self.parent.renameAction)
+        contextMenu.addAction(separator3)
+        contextMenu.addAction(self.parent.getPropAction)
+
+        self.parent.manageHighlighted(self, False)
+        contextMenu.exec_(self.mapToGlobal(event.pos()))
     
     def highlight(self):
         self.image.highlight() 
@@ -66,4 +89,5 @@ class FileButton(QWidget):
 
     def mouseReleaseEvent(self, event):
         modifiers = QApplication.keyboardModifiers()
-        self.parent.manageHighlighted(self, modifiers == Qt.ControlModifier)
+        if self.parent.curPath != self.path:
+            self.parent.manageHighlighted(self, modifiers == Qt.ControlModifier)
