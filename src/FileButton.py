@@ -33,6 +33,7 @@ class PicButton(QAbstractButton):
     def sizeHint(self):
         return self.pixmap.size()
 
+
 class FileButton(QWidget):
     def __init__(self, path, x, y, parent=None):
         super().__init__()

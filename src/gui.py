@@ -7,7 +7,7 @@ from copy import copy
 import qrc_res
 from FlowLayout import FlowLayout
 from FileButton import FileButton
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QFile, QTextStream
 from PyQt5.QtWidgets import (
     QApplication, 
     QWidget, 
@@ -27,6 +27,7 @@ from PyQt5.QtWidgets import (
     QTreeWidgetItem,
     QTreeWidget,
     QInputDialog,
+    QDirModel,
 )
 from PyQt5.QtGui import (
     QIcon, 
@@ -139,15 +140,6 @@ class Window(QMainWindow):
             self._updateMainPanel()
             self._clearHighlited()
 
-    def printDirTree(self, startpath, tree):
-        for element in os.listdir(startpath):
-            path_info = startpath + "/" + element
-            if os.path.isdir(path_info):
-                parent_itm = QTreeWidgetItem(tree, [os.path.basename(element)])
-                parent_itm.path = path_info
-                self.printDirTree(path_info, parent_itm)
-                parent_itm.setIcon(0, QIcon(":folder.svg"))
-
     ##### ACTIONS AND ACTION HANDLING #####
 
     def _handleGoPrevAction(self):
@@ -241,43 +233,58 @@ class Window(QMainWindow):
     def _createActions(self):
         self.newWindowAction = QAction(QIcon(":add.svg"), "&New Window", self)
         self.newWindowAction.triggered.connect(self._handleNewWindowAction)
+        self.newWindowAction.setShortcut("Ctrl+N")
         self.closeWindowAction = QAction(QIcon(":minus.svg"), "&Close Window")
         self.closeWindowAction.triggered.connect(self._handleCloseWindowAction)
+        self.closeWindowAction.setShortcut("Ctrl+Q")
         self.newFolderAction = QAction(QIcon(":folder.svg"), "&Folder", self)
         self.newFolderAction.triggered.connect(self._handleNewFolderAction)
+        self.newFolderAction.setShortcut("Shift+Ctrl+N")
         self.newFileAction = QAction(QIcon(":file.svg"), "&File", self)
         self.newFileAction.triggered.connect(self._handleNewFileAction)
+        self.newFileAction.setShortcut("Alt+Ctrl+N")
 
         self.openAction = QAction(QIcon(":add.svg"), "&Open", self)
         # TODO
         self.cutAction = QAction(QIcon(":scissors.svg"), "C&ut", self)
         self.cutAction.triggered.connect(self._handleCutAction)
+        self.cutAction.setShortcut("Ctrl+X")
         self.copyAction = QAction("&Copy", self)
         self.copyAction.triggered.connect(self._handleCopyAction)
+        self.copyAction.setShortcut("Ctrl+C")
         self.pasteAction = QAction("&Paste", self)
         self.pasteAction.triggered.connect(self._handlePasteAction)
+        self.pasteAction.setShortcut("Ctrl+V")
         self.removeAction = QAction(QIcon(":delete.svg"), "&Remove", self)
         self.removeAction.triggered.connect(self._handleRemoveAction)
         self.getPropAction = QAction("&Properties", self)
         self.getPropAction.triggered.connect(self._handleGetPropAction)
+        self.getPropAction.setShortcut("Alt+Return")
         self.renameAction = QAction(QIcon(":edit.svg"), "&Rename", self)
         self.renameAction.triggered.connect(self._handleRenameAction)
+        self.renameAction.setShortcut("F2")
         self.selectAllAction = QAction("&Select All", self)
         self.selectAllAction.triggered.connect(self._handleSelectAllAction)
+        self.selectAllAction.setShortcut("Ctrl+A")
 
         self.reloadFolderAction = QAction(QIcon(":refresh.svg"), "&Reload Folder", self)
         self.reloadFolderAction.triggered.connect(self._handleReloadFolderAction)
+        self.reloadFolderAction.setShortcut("F5")
         self.showHiddenAction = QAction("&Show Hidden", self)
         # TODO
 
         self.goPrevAction = QAction(QIcon(":left.svg"), "&Previous Folder", self)
         self.goPrevAction.triggered.connect(self._handleGoPrevAction)
+        self.goPrevAction.setShortcut("Alt+Left")
         self.goNextAction = QAction(QIcon(":right.svg"), "&Next Folder", self)
         self.goNextAction.triggered.connect(self._handleGoNextAction)
+        self.goNextAction.setShortcut("Alt+Right")
         self.goParentAction = QAction(QIcon(":down.svg"), "&Parent Folder", self)
         self.goParentAction.triggered.connect(self._handleGoParentAction)
+        self.goParentAction.setShortcut("Alt+Up")
         self.goHomeAction = QAction(QIcon(":home.svg"), "&Home", self)
         self.goHomeAction.triggered.connect(self._handleGoHomeAction)
+        self.goHomeAction.setShortcut("Alt+Home")
 
         self.helpAction = QAction("&Help Content", self)
         # TODO
@@ -333,7 +340,7 @@ class Window(QMainWindow):
         helpMenu.addAction(self.aboutAction)
 
     def _createToolBars(self):
-        toolBar = self.addToolBar("File")
+        toolBar = self.addToolBar("Toolbar")
         toolBar.setMovable(False)
         toolBar.addAction(self.goPrevAction)
         toolBar.addAction(self.goNextAction)
@@ -342,15 +349,15 @@ class Window(QMainWindow):
 
         self.dirPathSpinBox = QLineEdit()
         self.dirPathSpinBox.setText(self.curPath)
-        # self._setLocationBarCompleter() TODO
+        self.dirPathSpinBox.returnPressed.connect(self._handleGoToAction)
+        
+        completer = QCompleter(self)
+        completer.setModel(QDirModel(completer))
+        self.dirPathSpinBox.setCompleter(completer)
+
         toolBar.addWidget(self.dirPathSpinBox)
 
         toolBar.addAction(self.goToAction);
-
-    # def _setLocationBarCompleter(self): TODO
-    #     names = [f.split(os.sep)[-1] for f in self.files]
-    #     completer = QCompleter(names)
-    #     self.dirPathSpinBox.setCompleter(completer)
 
     def _createContextMenu(self):
         self.centralWidget.setContextMenuPolicy(Qt.ActionsContextMenu)
@@ -395,54 +402,57 @@ class Window(QMainWindow):
         self.statusbar.addPermanentWidget(self.itemCountLabel)
 
     ##### SIDE PANEL #####
+
+    def _printDirTree(self, item):
+        if item.was_expanded: return
+        item.was_expanded = True
+        startpath = item.path
+        try:
+            for element in os.listdir(startpath):
+                path_info = startpath + "/" + element
+                if os.path.isdir(path_info):
+                    parent_itm = QTreeWidgetItem(item, [os.path.basename(element)])
+                    parent_itm.path = path_info
+                    parent_itm.setIcon(0, QIcon(":folder.svg"))
+                    parent_itm.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
+                    parent_itm.was_expanded = False
+            
+            if len(os.listdir(startpath)) == 0:
+                parent_itm = QTreeWidgetItem(item, ["< empty directory >"])
+
+        except PermissionError:
+            parent_itm = QTreeWidgetItem(item, ["< permissions denied >"])
     
     def _createSidePanel(self):
-        def switchPage():
-            stackedLayout.setCurrentIndex(pageCombo.currentIndex())
-
         self.sidePanel = QWidget(self.centralWidget)
         layout = QVBoxLayout()
         self.sidePanel.setLayout(layout)
-        # combo box to switch between pages
-        pageCombo = QComboBox()
-        pageCombo.addItems(["Directory Tree", "Places"])
-        pageCombo.activated.connect(switchPage)
-        # stacked layout to switch between pages
-        stackedLayout = QStackedLayout()
-        # pages
-        dirTreePage = QTreeWidget(self.sidePanel);
-        self.printDirTree("/home/lukasz/Projects", dirTreePage)
+
+
+        dirTree = QTreeWidget(self.sidePanel);
 
         def onItemClicked():
-            self.jumpToDir(dirTreePage.selectedItems()[0].path, True)
+            self.jumpToDir(dirTree.selectedItems()[0].path, True)
 
-        dirTreePage.doubleClicked.connect(onItemClicked)
+        dirTree.doubleClicked.connect(onItemClicked)
+        dirTree.itemExpanded.connect(self._printDirTree)
 
+        home = QTreeWidgetItem(dirTree, [os.path.basename(os.getenv("HOME"))])
+        home.path = os.getenv("HOME")
+        home.setIcon(0, QIcon(":folder.svg"))
+        home.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
+        home.was_expanded = False
 
-        stackedLayout.addWidget(dirTreePage)
+        root = QTreeWidgetItem(dirTree, ["/"])
+        root.path = "/"
+        root.setIcon(0, QIcon(":folder.svg"))
+        root.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
+        root.was_expanded = False
 
-        placesPage = QWidget(self.sidePanel)
-        stackedLayout.addWidget(placesPage)
-
-        pal = QPalette()
-        pal.setColor(QPalette.Window, QColor(200, 200, 200))
-        dirTreePage.setAutoFillBackground(True)
-        dirTreePage.setPalette(pal)
-
-        pal2 = QPalette()
-        pal2.setColor(QPalette.Window, QColor(150, 150, 150))
-        placesPage.setAutoFillBackground(True)
-        placesPage.setPalette(pal2)
-
-        pal3 = QPalette()
-        pal3.setColor(QPalette.Window, QColor(50, 50, 50))
-        self.sidePanel.setAutoFillBackground(True)
-        self.sidePanel.setPalette(pal3)
         self.sidePanel.setMinimumWidth(100)
         self.sidePanel.setMaximumWidth(300)  # TODO initial splitter ratio
         
-        layout.addWidget(pageCombo)
-        layout.addLayout(stackedLayout)
+        layout.addWidget(dirTree)
 
     ##### MAIN PANEL #####
 
@@ -469,13 +479,32 @@ class Window(QMainWindow):
 
         self._updateMainPanel()
 
-        pal = QPalette()
-        pal.setColor(QPalette.Window, QColor(100, 100, 100))
-        self.mainPanel.setAutoFillBackground(True)
-        self.mainPanel.setPalette(pal)
+
+def createColorPalette():
+    palette = QPalette()
+    palette.setColor(QPalette.Window, QColor(53, 53, 53))
+    palette.setColor(QPalette.WindowText, Qt.white)
+    palette.setColor(QPalette.Base, QColor(25, 25, 25))
+    palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+    palette.setColor(QPalette.ToolTipBase, Qt.black)
+    palette.setColor(QPalette.ToolTipText, Qt.white)
+    palette.setColor(QPalette.Text, Qt.white)
+    palette.setColor(QPalette.Button, QColor(53, 53, 53))
+    palette.setColor(QPalette.ButtonText, Qt.white)
+    palette.setColor(QPalette.BrightText, Qt.red)
+    palette.setColor(QPalette.Link, QColor(42, 130, 218))
+    palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+    palette.setColor(QPalette.HighlightedText, Qt.black)
+
+    return palette
 
 def main():
     app = QApplication(sys.argv)
+
+    app.setStyle("Fusion")
+
+    app.setPalette(createColorPalette())
+
     win = Window()
     win.show()
     sys.exit(app.exec_())

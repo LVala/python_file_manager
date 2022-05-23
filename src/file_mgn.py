@@ -72,12 +72,3 @@ def getPartUsage(path):
 
 def renameFile(path, newname):
     os.rename(path, newname)
-
-
-
-# TODO:
-# upiekszenie i bugi wizualne
-# skroty klawiszowe
-# context menus
-# podpowiadanie w pasku
-# featury: glownie otwieranie plikow
