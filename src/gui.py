@@ -7,7 +7,7 @@ from copy import copy
 import qrc_res
 from FlowLayout import FlowLayout
 from FileButton import FileButton
-from PyQt5.QtCore import Qt, QFile, QTextStream
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QApplication, 
     QWidget, 
@@ -19,8 +19,6 @@ from PyQt5.QtWidgets import (
     QLabel, 
     QCompleter, 
     QSplitter,
-    QComboBox,
-    QStackedLayout,
     QVBoxLayout,
     QHBoxLayout,
     QScrollArea,
@@ -430,6 +428,7 @@ class Window(QMainWindow):
 
 
         dirTree = QTreeWidget(self.sidePanel);
+        dirTree.setHeaderLabels(["Directory Tree"])
 
         def onItemClicked():
             self.jumpToDir(dirTree.selectedItems()[0].path, True)
@@ -461,7 +460,7 @@ class Window(QMainWindow):
             self.grid_layout.itemAt(i).widget().setParent(None)
         
         for f in self.files:
-            fileButton = FileButton(f, 70, 70, parent=self)
+            fileButton = FileButton(f, 60, 60, parent=self)
             self.grid_layout.addWidget(fileButton)
 
         self._clearHighlited()
