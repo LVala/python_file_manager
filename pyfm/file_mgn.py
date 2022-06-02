@@ -29,6 +29,7 @@ def createEmptyFile(path):
 
 def getFileInfo(path):
     file_stat = os.stat(path)
+   
     stat_dir = {}
     if stat.S_ISDIR(file_stat[stat.ST_MODE]):
         stat_dir["type"] = "Directory"

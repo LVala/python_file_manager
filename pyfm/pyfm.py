@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
     QWidget, 
     QMainWindow,
     QDialog,
-    QDialogButtonBox,
+    QMessageBox,
     QAction, 
     QLineEdit, 
     QLabel, 
@@ -39,9 +39,6 @@ class PropertiesDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle('Properties')
         layout = QVBoxLayout()
-        # btns = QDialogButtonBox()
-        # btns.setStandardButtons(QDialogButtonBox.Ok)
-        # layout.addWidget(btns)
         self.setLayout(layout)
 
         info = getFileInfo(path)
@@ -88,7 +85,7 @@ class Window(QMainWindow):
 
         layout = QHBoxLayout(self.centralWidget)
         splitter = QSplitter(self.centralWidget)
-        layout.addWidget(splitter);
+        layout.addWidget(splitter)
         splitter.addWidget(self.sidePanel)
         splitter.addWidget(self.mainPanel)
 
@@ -127,16 +124,20 @@ class Window(QMainWindow):
         self._getItemCount()
 
     def jumpToDir(self, dir_path, addToHist):
-        dir_path = os.path.realpath(dir_path)
-        if os.path.isdir(dir_path):
-            if addToHist: 
-                self._addToHist(dir_path);
+        try:
+            dir_path = os.path.realpath(dir_path)
+            if os.path.isdir(dir_path):
+                if addToHist: 
+                    self._addToHist(dir_path)
 
-            self.curPath = dir_path
-            self.files = listAllFiles(self.curPath)
-            self.dirPathSpinBox.setText(self.curPath)
-            self._updateMainPanel()
-            self._clearHighlited()
+                self.curPath = dir_path
+                self.files = listAllFiles(self.curPath)
+                print(self.files)
+                self.dirPathSpinBox.setText(self.curPath)
+                self._updateMainPanel()
+                self._clearHighlited()
+        except PermissionError:
+            QMessageBox.about(self, "Error", "Unable to open the directory due to lack of permissions")
 
     ##### ACTIONS AND ACTION HANDLING #####
 
@@ -168,9 +169,12 @@ class Window(QMainWindow):
         exit(0)
 
     def _handleRemoveAction(self):
-        removeAllFiles([button.path for button in self.highlighted])
-        self.files = listAllFiles(self.curPath)
-        self._updateMainPanel()
+        try:
+            removeAllFiles([button.path for button in self.highlighted])
+            self.files = listAllFiles(self.curPath)
+            self._updateMainPanel()
+        except PermissionError:
+            QMessageBox.about(self, "Error", "Unable remove the file due to lack of permissions")
 
     def _handleSelectAllAction(self):
         self._clearHighlited()
@@ -189,44 +193,77 @@ class Window(QMainWindow):
         self.clipboard = copy([button.path for button in self.highlighted])
         self.clipaction = copyAllFiles
 
+
     def _handlePasteAction(self):
-        if len(self.clipboard) > 0:
-            self.clipaction(self.clipboard, self.curPath)
-            self.clipboard.clear()
-            self.files = listAllFiles(self.curPath)
-            self._updateMainPanel()
-
-    def _handleGetPropAction(self):
-        if len(self.highlighted) > 0:
-            dlg = PropertiesDialog(self.highlighted[0].path, parent=self)
-            dlg.show()
-
-    def _handleNewFolderAction(self):
-        text, ok = QInputDialog.getText(self, "folder name input", "Enter new folder name")
-        if ok:
-            createDirectory(os.path.join(self.curPath, text))
-            self.files = listAllFiles(self.curPath)
-            self._updateMainPanel()
-
-    def _handleNewFileAction(self):
-        text, ok = QInputDialog.getText(self, "folder name input", "Enter new file name")
-        if ok:
-            createEmptyFile(os.path.join(self.curPath, text))
-            self.files = listAllFiles(self.curPath)
-            self._updateMainPanel()
-
-    def _handleRenameAction(self):
-        if len(self.highlighted) == 1:
-            text, ok = QInputDialog.getText(self, "folder name input", "Enter new file name")
-            if ok:
-                renameFile(self.highlighted[0].path, os.path.join(self.curPath, text))
+        try:
+            if len(self.clipboard) > 0:
+                self.clipaction(self.clipboard, self.curPath)
+                self.clipboard.clear()
                 self.files = listAllFiles(self.curPath)
                 self._updateMainPanel()
+        except PermissionError:
+            QMessageBox.about(self, "Error", "Unable to paste the files due to lack of permissions")
+        except shutil.Error:
+            QMessageBox.about(self, "Error", "Unable to paste, files already exist")
+
+    def _handleGetPropAction(self):
+        try:
+            if len(self.highlighted) > 0:
+                dlg = PropertiesDialog(self.highlighted[0].path, parent=self)
+                dlg.show()
+        except PermissionError:
+            QMessageBox.about(self, "Error", "Unable to get file properties due to lack of permissions")
+
+    def _handleNewFolderAction(self):
+        try:
+            text, ok = QInputDialog.getText(self, "folder name input", "Enter new folder name")
+            if ok:
+                createDirectory(os.path.join(self.curPath, text))
+                self.files = listAllFiles(self.curPath)
+                self._updateMainPanel()
+        except PermissionError:
+            QMessageBox.about(self, "Error", "Unable to create folder due to lack of permissions")
+        except FileExistsError:
+            QMessageBox.about(self, "Error", "Unable to create, the folder already exists")
+
+    def _handleNewFileAction(self):
+        try:
+            text, ok = QInputDialog.getText(self, "folder name input", "Enter new file name")
+            if ok:
+                createEmptyFile(os.path.join(self.curPath, text))
+                self.files = listAllFiles(self.curPath)
+                self._updateMainPanel()
+        except PermissionError:
+            QMessageBox.about(self, "Error", "Unable to create file due to lack of permissions")
+        except FileExistsError:
+            QMessageBox.about(self, "Error", "Unable to create, the file already exists")
+
+    def _handleRenameAction(self):
+        try:
+            if len(self.highlighted) == 1:
+                text, ok = QInputDialog.getText(self, "folder name input", "Enter new file name")
+                if ok:
+                    renameFile(self.highlighted[0].path, os.path.join(self.curPath, text))
+                    self.files = listAllFiles(self.curPath)
+                    self._updateMainPanel()
+        except PermissionError:
+            QMessageBox.about(self, "Error", "Unable to rename the file due to lack of permissions")
+        except IsADirectoryError:
+            QMessageBox.about(self, "Error", "Unable to rename, directory with that name already exists")
 
     def _handleGetCurPropAction(self):
-        dlg = PropertiesDialog(self.curPath, parent=self)
-        dlg.show()
+        try:
+            dlg = PropertiesDialog(self.curPath, parent=self)
+            dlg.show()
+        except PermissionError:
+            QMessageBox.about(self, "Error", "Unable to get file properties due to lack of permissions")
     
+    def _handleOpenAction(self):
+        if len(self.highlighted) == 1:
+            self.jumpToDir(self.highlighted[0].path, True);
+
+    def _handleAboutAction(self):
+        QMessageBox.about(self, "About", "Python file manager\nŁukasz Wala")
 
     def _createActions(self):
         self.newWindowAction = QAction(QIcon(":add.svg"), "&New Window", self)
@@ -243,7 +280,7 @@ class Window(QMainWindow):
         self.newFileAction.setShortcut("Alt+Ctrl+N")
 
         self.openAction = QAction(QIcon(":add.svg"), "&Open", self)
-        # TODO
+        self.openAction.triggered.connect(self._handleOpenAction);
         self.cutAction = QAction(QIcon(":scissors.svg"), "C&ut", self)
         self.cutAction.triggered.connect(self._handleCutAction)
         self.cutAction.setShortcut("Ctrl+X")
@@ -268,8 +305,6 @@ class Window(QMainWindow):
         self.reloadFolderAction = QAction(QIcon(":refresh.svg"), "&Reload Folder", self)
         self.reloadFolderAction.triggered.connect(self._handleReloadFolderAction)
         self.reloadFolderAction.setShortcut("F5")
-        self.showHiddenAction = QAction("&Show Hidden", self)
-        # TODO
 
         self.goPrevAction = QAction(QIcon(":left.svg"), "&Previous Folder", self)
         self.goPrevAction.triggered.connect(self._handleGoPrevAction)
@@ -284,12 +319,10 @@ class Window(QMainWindow):
         self.goHomeAction.triggered.connect(self._handleGoHomeAction)
         self.goHomeAction.setShortcut("Alt+Home")
 
-        self.helpAction = QAction("&Help Content", self)
-        # TODO
         self.aboutAction = QAction("&About", self)
         # TODO
 
-        self.goToAction = QAction(QIcon(":forward.svg"), "&Go to the path in the location bar", self);
+        self.goToAction = QAction(QIcon(":forward.svg"), "&Go to the path in the location bar", self)
         self.goToAction.triggered.connect(self._handleGoToAction)
 
         self.getCurPropAction = QAction("&Folder Properties", self)
@@ -325,7 +358,6 @@ class Window(QMainWindow):
 
         viewMenu = menuBar.addMenu("&View")
         viewMenu.addAction(self.reloadFolderAction)
-        viewMenu.addAction(self.showHiddenAction)
 
         goMenu = menuBar.addMenu("&Go")
         goMenu.addAction(self.goPrevAction)
@@ -334,7 +366,6 @@ class Window(QMainWindow):
         goMenu.addAction(self.goHomeAction)
 
         helpMenu = menuBar.addMenu("&Help")
-        helpMenu.addAction(self.helpAction)
         helpMenu.addAction(self.aboutAction)
 
     def _createToolBars(self):
@@ -355,7 +386,7 @@ class Window(QMainWindow):
 
         toolBar.addWidget(self.dirPathSpinBox)
 
-        toolBar.addAction(self.goToAction);
+        toolBar.addAction(self.goToAction)
 
     def _createContextMenu(self):
         self.centralWidget.setContextMenuPolicy(Qt.ActionsContextMenu)
@@ -416,10 +447,10 @@ class Window(QMainWindow):
                     parent_itm.was_expanded = False
             
             if len(os.listdir(startpath)) == 0:
-                parent_itm = QTreeWidgetItem(item, ["< empty directory >"])
+                parent_itm = QTreeWidgetItem(item, ["<No subfolders>"])
 
         except PermissionError:
-            parent_itm = QTreeWidgetItem(item, ["< permissions denied >"])
+            parent_itm = QTreeWidgetItem(item, ["<Permissions denied>"])
     
     def _createSidePanel(self):
         self.sidePanel = QWidget(self.centralWidget)
@@ -427,7 +458,7 @@ class Window(QMainWindow):
         self.sidePanel.setLayout(layout)
 
 
-        dirTree = QTreeWidget(self.sidePanel);
+        dirTree = QTreeWidget(self.sidePanel)
         dirTree.setHeaderLabels(["Directory Tree"])
 
         def onItemClicked():
@@ -472,7 +503,7 @@ class Window(QMainWindow):
         self.grid_layout = FlowLayout()
         grid.setLayout(self.grid_layout)
 
-        self.mainPanel = QScrollArea();
+        self.mainPanel = QScrollArea()
         self.mainPanel.setWidgetResizable(True)
         self.mainPanel.setWidget(grid)
 
@@ -499,8 +530,6 @@ def createColorPalette():
 
 def main():
     app = QApplication(sys.argv)
-
-    app.setStyle("Fusion")
 
     app.setPalette(createColorPalette())
 
