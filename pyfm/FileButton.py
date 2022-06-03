@@ -1,4 +1,4 @@
-import qrc_res
+import pyfm.qrcRes
 
 import os
 from PyQt5.QtGui import QPainter, QPixmap, QColor, QBrush, QPen
@@ -10,8 +10,8 @@ class PicButton(QAbstractButton):
         super(PicButton, self).__init__(parent)
         self.pixmap = pixmap
         self.pixmap = pixmap.scaled(x, y, Qt.KeepAspectRatio)
-        self.pixmap_copy = pixmap
-        self.pixmap_copy = pixmap.scaled(x, y, Qt.KeepAspectRatio)
+        self.pixmapCopy = pixmap
+        self.pixmapCopy = pixmap.scaled(x, y, Qt.KeepAspectRatio)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -27,7 +27,7 @@ class PicButton(QAbstractButton):
         self.update()
 
     def deHighlight(self):
-        self.pixmap = self.pixmap_copy.copy()
+        self.pixmap = self.pixmapCopy.copy()
         self.update()
 
     def sizeHint(self):

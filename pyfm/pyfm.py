@@ -4,9 +4,10 @@ import subprocess
 from pathlib import Path
 from copy import copy
 
-import qrc_res
-from FlowLayout import FlowLayout
-from FileButton import FileButton
+import pyfm.qrcRes
+from pyfm.FlowLayout import FlowLayout
+from pyfm.FileButton import FileButton
+from pyfm.fileMng import *
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QApplication, 
@@ -32,7 +33,6 @@ from PyQt5.QtGui import (
     QPalette, 
     QColor,
 )
-from file_mgn import *
 
 class PropertiesDialog(QDialog):
     def __init__(self, path, parent=None):
@@ -47,17 +47,17 @@ class PropertiesDialog(QDialog):
         ftype = QLabel(f"Type: {info['type']}")
         permissions = QLabel(f"Permissions: {info['permissions']}")
         size = QLabel(f"Size: {info['size']} K")
-        lastmod = QLabel(f"Last modification date: {info['lastmod']}")
-        lastaccess = QLabel(f"Last access date: {info['lastaccess']}")
-        lastmeta = QLabel(f"Last metadata modification date: {info['lastmeta']}")
+        lastMod = QLabel(f"Last modification date: {info['lastmod']}")
+        lastAccess = QLabel(f"Last access date: {info['lastaccess']}")
+        lastMeta = QLabel(f"Last metadata modification date: {info['lastmeta']}")
         layout.addWidget(name)
         layout.addWidget(location)
         layout.addWidget(ftype)
         layout.addWidget(permissions)
         layout.addWidget(size)
-        layout.addWidget(lastmod)
-        layout.addWidget(lastaccess)
-        layout.addWidget(lastmeta)
+        layout.addWidget(lastMod)
+        layout.addWidget(lastAccess)
+        layout.addWidget(lastMeta)
 
 class Window(QMainWindow):
     def __init__(self, parent=None):
@@ -123,16 +123,15 @@ class Window(QMainWindow):
 
         self._getItemCount()
 
-    def jumpToDir(self, dir_path, addToHist):
+    def jumpToDir(self, dirPath, addToHist):
         try:
-            dir_path = os.path.realpath(dir_path)
-            if os.path.isdir(dir_path):
+            dirPath = os.path.realpath(dirPath)
+            if os.path.isdir(dirPath):
                 if addToHist: 
-                    self._addToHist(dir_path)
+                    self._addToHist(dirPath)
 
-                self.curPath = dir_path
+                self.curPath = dirPath
                 self.files = listAllFiles(self.curPath)
-                print(self.files)
                 self.dirPathSpinBox.setText(self.curPath)
                 self._updateMainPanel()
                 self._clearHighlited()
@@ -178,8 +177,8 @@ class Window(QMainWindow):
 
     def _handleSelectAllAction(self):
         self._clearHighlited()
-        for i in reversed(range(self.grid_layout.count())): 
-            self.manageHighlighted(self.grid_layout.itemAt(i).widget(), True)
+        for i in reversed(range(self.gridLayout.count())): 
+            self.manageHighlighted(self.gridLayout.itemAt(i).widget(), True)
 
     def _handleReloadFolderAction(self):
         self.files = listAllFiles(self.curPath)
@@ -192,7 +191,6 @@ class Window(QMainWindow):
     def _handleCopyAction(self):
         self.clipboard = copy([button.path for button in self.highlighted])
         self.clipaction = copyAllFiles
-
 
     def _handlePasteAction(self):
         try:
@@ -433,20 +431,20 @@ class Window(QMainWindow):
     ##### SIDE PANEL #####
 
     def _printDirTree(self, item):
-        if item.was_expanded: return
-        item.was_expanded = True
-        startpath = item.path
+        if item.wasExpanded: return
+        item.wasExpanded = True
+        startPath = item.path
         try:
-            for element in os.listdir(startpath):
-                path_info = startpath + "/" + element
+            for element in os.listdir(startPath):
+                path_info = startPath + "/" + element
                 if os.path.isdir(path_info):
                     parent_itm = QTreeWidgetItem(item, [os.path.basename(element)])
                     parent_itm.path = path_info
                     parent_itm.setIcon(0, QIcon(":folder.svg"))
                     parent_itm.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
-                    parent_itm.was_expanded = False
+                    parent_itm.wasExpanded = False
             
-            if len(os.listdir(startpath)) == 0:
+            if len(os.listdir(startPath)) == 0:
                 parent_itm = QTreeWidgetItem(item, ["<No subfolders>"])
 
         except PermissionError:
@@ -471,28 +469,28 @@ class Window(QMainWindow):
         home.path = os.getenv("HOME")
         home.setIcon(0, QIcon(":folder.svg"))
         home.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
-        home.was_expanded = False
+        home.wasExpanded = False
 
         root = QTreeWidgetItem(dirTree, ["/"])
         root.path = "/"
         root.setIcon(0, QIcon(":folder.svg"))
         root.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
-        root.was_expanded = False
+        root.wasExpanded = False
 
         self.sidePanel.setMinimumWidth(100)
-        self.sidePanel.setMaximumWidth(300)  # TODO initial splitter ratio
+        self.sidePanel.setMaximumWidth(300)
         
         layout.addWidget(dirTree)
 
     ##### MAIN PANEL #####
 
     def _updateMainPanel(self):
-        for i in reversed(range(self.grid_layout.count())): 
-            self.grid_layout.itemAt(i).widget().setParent(None)
+        for i in reversed(range(self.gridLayout.count())): 
+            self.gridLayout.itemAt(i).widget().setParent(None)
         
         for f in self.files:
             fileButton = FileButton(f, 60, 60, parent=self)
-            self.grid_layout.addWidget(fileButton)
+            self.gridLayout.addWidget(fileButton)
 
         self._clearHighlited()
         self._getSpaceUsed(False)
@@ -500,8 +498,8 @@ class Window(QMainWindow):
     def _createMainPanel(self):
         grid = QWidget()
         grid.mouseReleaseEvent = lambda event: self._clearHighlited()
-        self.grid_layout = FlowLayout()
-        grid.setLayout(self.grid_layout)
+        self.gridLayout = FlowLayout()
+        grid.setLayout(self.gridLayout)
 
         self.mainPanel = QScrollArea()
         self.mainPanel.setWidgetResizable(True)
@@ -536,6 +534,3 @@ def main():
     win = Window()
     win.show()
     sys.exit(app.exec_())
-
-if __name__ == "__main__":
-    main()
