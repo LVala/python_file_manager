@@ -1,17 +1,17 @@
-import pyfm.qrcRes
-
-import os
 from PyQt5.QtGui import QPainter, QPixmap, QColor, QBrush, QPen
 from PyQt5.QtWidgets import QAbstractButton, QAction, QWidget, QVBoxLayout, QLabel, QApplication, QMenu
 from PyQt5.QtCore import Qt
+import pyfm.grc_res
+
+import os
 
 class PicButton(QAbstractButton):
     def __init__(self, pixmap, x, y, parent=None):
         super(PicButton, self).__init__(parent)
         self.pixmap = pixmap
         self.pixmap = pixmap.scaled(x, y, Qt.KeepAspectRatio)
-        self.pixmapCopy = pixmap
-        self.pixmapCopy = pixmap.scaled(x, y, Qt.KeepAspectRatio)
+        self.pixmap_copy = pixmap
+        self.pixmap_copy = pixmap.scaled(x, y, Qt.KeepAspectRatio)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -26,13 +26,12 @@ class PicButton(QAbstractButton):
         mask.drawRect(0,0,200,200)
         self.update()
 
-    def deHighlight(self):
-        self.pixmap = self.pixmapCopy.copy()
+    def dehighlight(self):
+        self.pixmap = self.pixmap_copy.copy()
         self.update()
 
     def sizeHint(self):
         return self.pixmap.size()
-
 
 class FileButton(QWidget):
     def __init__(self, path, x, y, parent=None):
@@ -57,7 +56,7 @@ class FileButton(QWidget):
         self.image.mouseReleaseEvent = self.mouseReleaseEvent
 
     def contextMenuEvent(self, event):
-        contextMenu = QMenu(self);
+        context_menu = QMenu(self);
 
         separator1 = QAction(self)
         separator1.setSeparator(True)
@@ -66,29 +65,29 @@ class FileButton(QWidget):
         separator3 = QAction(self)
         separator3.setSeparator(True)
 
-        contextMenu.addAction(self.parent.openAction)
-        contextMenu.addAction(separator1)
-        contextMenu.addAction(self.parent.cutAction)
-        contextMenu.addAction(self.parent.copyAction)
-        contextMenu.addAction(self.parent.removeAction)
-        contextMenu.addAction(separator2)
-        contextMenu.addAction(self.parent.renameAction)
-        contextMenu.addAction(separator3)
-        contextMenu.addAction(self.parent.getPropAction)
+        context_menu.addAction(self.parent.openAction)
+        context_menu.addAction(separator1)
+        context_menu.addAction(self.parent.cutAction)
+        context_menu.addAction(self.parent.copyAction)
+        context_menu.addAction(self.parent.removeAction)
+        context_menu.addAction(separator2)
+        context_menu.addAction(self.parent.renameAction)
+        context_menu.addAction(separator3)
+        context_menu.addAction(self.parent.getPropAction)
 
-        self.parent.manageHighlighted(self, False)
-        contextMenu.exec_(self.mapToGlobal(event.pos()))
+        self.parent.manage_highlighted(self, False)
+        context_menu.exec_(self.mapToGlobal(event.pos()))
     
     def highlight(self):
         self.image.highlight() 
     
-    def deHighlight(self):
-        self.image.deHighlight()
+    def dehighlight(self):
+        self.image.dehighlight()
     
     def mouseDoubleClickEvent(self, event):
-        self.parent.jumpToDir(self.path, True)
+        self.parent.jump_to_dir(self.path, True)
 
     def mouseReleaseEvent(self, event):
         modifiers = QApplication.keyboardModifiers()
-        if self.parent.curPath != self.path:
-            self.parent.manageHighlighted(self, modifiers == Qt.ControlModifier)
+        if self.parent.cur_path != self.path:
+            self.parent.manage_highlighted(self, modifiers == Qt.ControlModifier)
