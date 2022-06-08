@@ -1,7 +1,7 @@
 from PyQt5.QtGui import QPainter, QPixmap, QColor, QBrush, QPen
 from PyQt5.QtWidgets import QAbstractButton, QAction, QWidget, QVBoxLayout, QLabel, QApplication, QMenu
 from PyQt5.QtCore import Qt
-import pyfm.grc_res
+import pyfm.qrc_resources
 
 import os
 
@@ -40,7 +40,7 @@ class FileButton(QWidget):
         self.parent = parent;
         self.image = PicButton(pixmap, x, y, parent=self)
         self.image.setFixedSize(x, y)
-        self.setFixedWidth(y+20)
+        self.setFixedWidth(y+30)
 
         self.path = path
         self.label = QLabel(path.split(os.sep)[-1])
@@ -65,15 +65,15 @@ class FileButton(QWidget):
         separator3 = QAction(self)
         separator3.setSeparator(True)
 
-        context_menu.addAction(self.parent.openAction)
+        context_menu.addAction(self.parent.open_action)
         context_menu.addAction(separator1)
-        context_menu.addAction(self.parent.cutAction)
-        context_menu.addAction(self.parent.copyAction)
-        context_menu.addAction(self.parent.removeAction)
+        context_menu.addAction(self.parent.cut_action)
+        context_menu.addAction(self.parent.copy_action)
+        context_menu.addAction(self.parent.remove_action)
         context_menu.addAction(separator2)
-        context_menu.addAction(self.parent.renameAction)
+        context_menu.addAction(self.parent.rename_action)
         context_menu.addAction(separator3)
-        context_menu.addAction(self.parent.getPropAction)
+        context_menu.addAction(self.parent.get_prop_action)
 
         self.parent.manage_highlighted(self, False)
         context_menu.exec_(self.mapToGlobal(event.pos()))

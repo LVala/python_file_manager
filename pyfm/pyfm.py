@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from copy import copy
 
-import pyfm.grc_res
+import pyfm.qrc_resources
 from pyfm.flow_layout import FlowLayout
 from pyfm.file_button import FileButton
 from pyfm.file_manage import *
@@ -30,6 +30,8 @@ from PyQt5.QtWidgets import (
     QInputDialog,
     QDirModel,
 )
+
+TEXT_EDITOR = "code"
 
 class PropertiesDialog(QDialog):
     def __init__(self, path, parent=None):
@@ -159,7 +161,7 @@ class Window(QMainWindow):
         self.jump_to_dir(self.dir_path_spinbox.text(), True)
 
     def _handle_new_window_action(self):
-        subprocess.Popen(["python", "./gui.py"])
+        subprocess.Popen(["pyfm"])
 
     def _handle_close_window_action(self):
         exit(0)
@@ -255,7 +257,10 @@ class Window(QMainWindow):
     
     def _handle_open_action(self):
         if len(self.highlighted) == 1:
-            self.jump_to_dir(self.highlighted[0].path, True);
+            if os.path.isdir(self.highlighted[0].path):
+                self.jump_to_dir(self.highlighted[0].path, True)
+            else:
+                subprocess.Popen([TEXT_EDITOR, self.highlighted[0].path])
 
     def _handle_about_action(self):
         QMessageBox.about(self, "About", "Python file manager\nŁukasz Wala")
@@ -437,9 +442,11 @@ class Window(QMainWindow):
             
             if len(os.listdir(start_path)) == 0:
                 parent_itm = QTreeWidgetItem(item, ["<No subfolders>"])
+                parent_itm.path = ""
 
         except PermissionError:
             parent_itm = QTreeWidgetItem(item, ["<Permissions denied>"])
+            parent_itm.path = ""
     
     def _create_side_panel(self):
         self.side_panel = QWidget(self.centralWidget)
