@@ -12,3 +12,8 @@ This repository contains project for Programming in Python Course. It is a simpl
 $ pip install path/to/repository
 ```
 If you want to develop the project, use ```pip install -e```, which dynamically links project files instead of copying them. 
+
+You can run the program with (if directory with pip scripts is addded to PATH)
+```bash
+$ pyfm
+```
